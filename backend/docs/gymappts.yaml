@@ -1,0 +1,325 @@
+openapi: 3.0.3
+info:
+  title: Gym Management API
+  version: 1.0.0
+  description: API for staff authentication, members, membership plans, trainers, payments, and attendance.
+servers:
+  - url: http://localhost:5000/api/v1
+    description: Local development
+security:
+  - bearerAuth: []
+tags:
+  - name: Authentication
+  - name: Users
+  - name: Members
+  - name: Plans
+  - name: Trainers
+  - name: Payments
+  - name: Attendance
+paths:
+  /health:
+    get:
+      security: []
+      tags: [Authentication]
+      summary: Check API and database readiness
+      responses:
+        '200': { description: API and database are ready }
+        '503': { description: Database is disconnected }
+  /auth/register:
+    post:
+      security: []
+      tags: [Authentication]
+      summary: Create the first administrator account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password]
+              properties:
+                name: { type: string, minLength: 2, maxLength: 100 }
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8, maxLength: 72 }
+      responses:
+        '201': { description: Admin account created; bearer token returned }
+        '403': { description: Public setup has already been completed }
+  /auth/login:
+    post:
+      security: []
+      tags: [Authentication]
+      summary: Sign in and receive a bearer token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8 }
+      responses:
+        '200': { description: User and token returned }
+        '401': { description: Credentials are invalid }
+  /auth/me:
+    get:
+      tags: [Authentication]
+      summary: Get the signed-in user
+      responses:
+        '200': { description: User profile returned }
+        '401': { description: Missing or invalid token }
+  /auth/staff:
+    post:
+      tags: [Users]
+      summary: Create a staff account
+      description: Administrator only. Accepts name, email, and password.
+      responses:
+        '201': { description: Staff account created }
+        '403': { description: Administrator access required }
+  /users:
+    get:
+      tags: [Users]
+      summary: List staff and administrator accounts
+      description: Administrator only. Supports page, limit, search, and active=true|false.
+      responses:
+        '200': { description: Paginated users returned; password hashes are never included }
+  /users/{id}:
+    get:
+      tags: [Users]
+      summary: Get a staff account
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200': { description: User returned }
+        '404': { description: User not found }
+  /users/{id}/active:
+    patch:
+      tags: [Users]
+      summary: Activate or deactivate a staff account
+      description: Administrator only. Admin accounts and the current account cannot be deactivated here.
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [active]
+              properties:
+                active: { type: boolean }
+      responses:
+        '200': { description: User status updated }
+        '400': { description: Current or administrator account cannot be deactivated }
+  /members:
+    get:
+      tags: [Members]
+      summary: List members
+      description: Supports page, limit, search, and status filters.
+      responses:
+        '200': { description: Paginated members returned }
+    post:
+      tags: [Members]
+      summary: Create a member
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [firstName, lastName, email]
+              properties:
+                firstName: { type: string }
+                lastName: { type: string }
+                email: { type: string, format: email }
+                phone: { type: string }
+                dateOfBirth: { type: string, format: date-time }
+                plan: { type: string, description: Existing active plan id }
+                trainer: { type: string, description: Existing active trainer id }
+                membershipStart: { type: string, format: date-time }
+                membershipEnd: { type: string, format: date-time }
+                status: { type: string, enum: [active, inactive, suspended] }
+                notes: { type: string }
+      responses:
+        '201': { description: Member created }
+  /members/{id}:
+    get:
+      tags: [Members]
+      summary: Get member details
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { description: Member returned with plan and trainer details }
+    patch:
+      tags: [Members]
+      summary: Update member details
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { description: Member updated }
+    delete:
+      tags: [Members]
+      summary: Archive a member by setting status to inactive
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { description: Member archived }
+  /plans:
+    get:
+      tags: [Plans]
+      summary: List membership plans
+      description: Supports page, limit, search, and status=active|inactive.
+      responses:
+        '200': { description: Paginated plans returned }
+    post:
+      tags: [Plans]
+      summary: Create a membership plan
+      description: Administrator only. Requires name, durationDays, and price.
+      responses:
+        '201': { description: Plan created }
+  /plans/{id}:
+    get:
+      tags: [Plans]
+      summary: Get a plan
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { description: Plan returned }
+    patch:
+      tags: [Plans]
+      summary: Update a plan
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { description: Plan updated }
+    delete:
+      tags: [Plans]
+      summary: Archive a plan by setting active=false
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { description: Plan archived }
+  /trainers:
+    get:
+      tags: [Trainers]
+      summary: List trainers
+      description: Supports page, limit, search, and status=active|inactive.
+      responses:
+        '200': { description: Paginated trainers returned }
+    post:
+      tags: [Trainers]
+      summary: Create a trainer
+      description: Requires firstName, lastName, and email.
+      responses:
+        '201': { description: Trainer created }
+  /trainers/{id}:
+    get:
+      tags: [Trainers]
+      summary: Get a trainer
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { description: Trainer returned }
+    patch:
+      tags: [Trainers]
+      summary: Update a trainer
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { description: Trainer updated }
+    delete:
+      tags: [Trainers]
+      summary: Archive a trainer by setting active=false
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { description: Trainer archived }
+  /payments:
+    get:
+      tags: [Payments]
+      summary: List payment records
+      description: Filter by member, status, from, or to; supports page and limit.
+      responses:
+        '200': { description: Paginated payments returned }
+    post:
+      tags: [Payments]
+      summary: Record payment
+      description: Provide a member and method, plus a plan or amount. A paid plan payment starts or extends membership. A pending payment does not.
+      responses:
+        '201': { description: Payment recorded }
+  /payments/{id}:
+    get:
+      tags: [Payments]
+      summary: Get payment details
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { description: Payment returned }
+  /payments/{id}/mark-paid:
+    patch:
+      tags: [Payments]
+      summary: Mark a pending payment paid
+      description: Administrator only. Applies the associated plan to the member.
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { description: Payment updated and membership applied }
+  /payments/{id}/refund:
+    post:
+      tags: [Payments]
+      summary: Refund a payment
+      description: Administrator only. Reverts its membership change if no later renewal has changed the member's membership end date.
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { description: Payment refunded and membership reverted }
+        '409': { description: A later renewal prevents safe automatic reversal }
+  /attendance:
+    get:
+      tags: [Attendance]
+      summary: List attendance
+      description: Filter by member, from, to, or openOnly=true; supports page and limit.
+      responses:
+        '200': { description: Paginated attendance records returned }
+  /attendance/check-in:
+    post:
+      tags: [Attendance]
+      summary: Check in a member
+      description: Requires an active member with a valid membership at the check-in time. A member may have only one open visit.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [member]
+              properties:
+                member: { type: string }
+                checkInAt: { type: string, format: date-time }
+                notes: { type: string }
+      responses:
+        '201': { description: Member checked in }
+        '403': { description: No valid membership at the requested time }
+        '409': { description: Already checked in }
+  /attendance/{id}:
+    get:
+      tags: [Attendance]
+      summary: Get attendance record
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { description: Attendance record returned }
+    delete:
+      tags: [Attendance]
+      summary: Delete attendance record (administrator only)
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { description: Attendance record deleted }
+  /attendance/{id}/check-out:
+    patch:
+      tags: [Attendance]
+      summary: Check out a member
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { description: Member checked out }
+        '409': { description: Already checked out }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, pattern: '^[a-fA-F0-9]{24}$' }
